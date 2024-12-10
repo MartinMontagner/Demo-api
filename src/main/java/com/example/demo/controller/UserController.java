@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.exception.EmailAlreadyExistsException;
 import com.example.demo.exception.UserNotFoundException;
+import com.example.demo.model.Post;
 import com.example.demo.model.User;
 import com.example.demo.repository.UserRepository;
 import jakarta.validation.Valid;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -30,15 +32,20 @@ public class UserController {
         return userRepository.findAll();
     }
     // Crear un nuevo usuario
-    @PostMapping
-    public String createUser(@Valid @RequestBody User user) {
 
-            if (userRepository.existsByEmail(user.getEmail())) {
-                throw new EmailAlreadyExistsException("El email " + user.getEmail() + " ya está registrado.");
-            }
+    @PostMapping
+    public ResponseEntity<String> createUser(@Valid @RequestBody User user, BindingResult result) {
+        if (result.hasErrors()) {
+            return ResponseEntity.badRequest().body(
+                    result.getFieldErrors().stream()
+                            .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                            .collect(Collectors.joining(", "))
+            );
+        }
         userRepository.save(user);
-        return "Usuario creado exitosamente.";
+        return ResponseEntity.status(HttpStatus.CREATED).body("Usuario creado exitosamente.");
     }
+
 
     // Actualizar un usuario por ID
     @PutMapping("/{id}")
@@ -120,5 +127,14 @@ public class UserController {
         userRepository.saveAll(users);
         return ResponseEntity.ok("Todos los nombres de usuario han sido restablecidos.");
     }
+    @PostMapping("/{userId}/posts")
+    public ResponseEntity<String> createPost(@PathVariable Long userId, @Valid @RequestBody Post post) {
+        return userRepository.findById(userId).map(user -> {
+            user.addPost(post);
+            userRepository.save(user);
+            return ResponseEntity.status(HttpStatus.CREATED).body("Post creado exitosamente.");
+        }).orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuario no encontrado."));
+    }
+
 
 }

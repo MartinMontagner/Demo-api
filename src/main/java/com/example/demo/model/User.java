@@ -2,57 +2,54 @@ package com.example.demo.model;
 
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "users")
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
 
-    @NotEmpty(message = "El nombre no puede estar vacío.")
-    private String name;
+        @NotBlank(message = "El nombre no puede estar vacío.")
+        @Size(min = 2, max = 50, message = "El nombre debe tener entre 2 y 50 caracteres.")
+        private String name;
 
-    @Email(message = "El email debe tener un formato válido.")
-    @NotEmpty(message = "El email no puede estar vacío.")
+        @NotBlank(message = "El correo electrónico no puede estar vacío.")
+        @Email(message = "Debe proporcionar un correo electrónico válido.")
+        private String email;
+        @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+        private List<Post> posts = new ArrayList<>();
 
-    private String email;
+        // Métodos para gestionar la lista de posts
+        public void addPost(Post post) {
+                posts.add(post);
+                post.setUser(this);
+        }
 
+        public void removePost(Post post) {
+                posts.remove(post);
+                post.setUser(null);
+        }
 
-    public User() {
-    }
+        // Constructor por defecto
+        public User() {}
 
-    // Constructor
-    public User(Long id, String name, String email) {
-        this.id = id;
-        this.name = name;
-        this.email = email;
-    }
+        // Constructor con parámetros
+        public User(String name, String email) {
+            this.name = name;
+            this.email = email;
+        }
 
-    // Getters y Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
+        // Getters y setters
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
 }
