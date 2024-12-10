@@ -1,9 +1,28 @@
 package com.example.demo.model;
 
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotEmpty;
+@Entity
+@Table(name = "users")
 public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @NotEmpty(message = "El nombre no puede estar vacío.")
     private String name;
+
+    @Email(message = "El email debe tener un formato válido.")
+    @NotEmpty(message = "El email no puede estar vacío.")
+
     private String email;
+
+
+    public User() {
+    }
 
     // Constructor
     public User(Long id, String name, String email) {

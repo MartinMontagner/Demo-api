@@ -1,65 +1,124 @@
 package com.example.demo.controller;
 
+import com.example.demo.exception.EmailAlreadyExistsException;
+import com.example.demo.exception.UserNotFoundException;
 import com.example.demo.model.User;
+import com.example.demo.repository.UserRepository;
+import jakarta.validation.Valid;
+import org.hibernate.mapping.Map;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/users")
 public class UserController {
 
-    private List<User> users = new ArrayList<>();
-
-    // Obtener todos los usuarios
+    @Autowired
+    private UserRepository userRepository;
     @GetMapping
-    public List<User> getAllUsers() {
-        return users;
+    public List<User> mostrarUsuarios ()
+    {
+        return userRepository.findAll();
     }
-
     // Crear un nuevo usuario
     @PostMapping
-    public String createUser(@RequestBody User user) {
-        if (user.getName() == null || user.getName().isEmpty()){
-            return "El campo 'name' es obligatorio.";
-        }
-        if(user.getEmail()==null || user.getEmail().isEmpty())
-        {
-            return "El campo 'email' es obligatorio";
-        }
-        users.add(user);
+    public String createUser(@Valid @RequestBody User user) {
+
+            if (userRepository.existsByEmail(user.getEmail())) {
+                throw new EmailAlreadyExistsException("El email " + user.getEmail() + " ya está registrado.");
+            }
+        userRepository.save(user);
         return "Usuario creado exitosamente.";
     }
 
     // Actualizar un usuario por ID
     @PutMapping("/{id}")
-    public String updateUser(@PathVariable Long id, @RequestBody User updatedUser) {
-        for (User user : users) {
-            if (user.getId().equals(id)) {
-                user.setName(updatedUser.getName());
-                user.setEmail(updatedUser.getEmail());
-                return "Usuario actualizado exitosamente.";
-            }
-        }
-        return "Usuario no encontrado.";
+    public String updateUser(@PathVariable Long id, @Valid @RequestBody User updatedUser) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("Usuario con ID " + id + " no encontrado."));
+
+        user.setName(updatedUser.getName());
+        user.setEmail(updatedUser.getEmail());
+        userRepository.save(user);
+
+        return "Usuario actualizado exitosamente.";
     }
     @GetMapping("/{id}")
     public User buscarUserId(@PathVariable Long id)
     {
-        for(User user: users)
-        {
-            if(user.getId().equals(id))
-            {
-                return user;
-            }
-        }return null;
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("Usuario con ID " + id + " no encontrado."));
     }
 
     // Eliminar un usuario por ID
     @DeleteMapping("/{id}")
     public String deleteUser(@PathVariable Long id) {
-        users.removeIf(user -> user.getId().equals(id));
+        userRepository.delete(buscarUserId(id));
         return "Usuario eliminado exitosamente.";
     }
+
+    @GetMapping("/email/{email}")
+    public ResponseEntity<User> getUserByEmail(@PathVariable String email) {
+        return userRepository.findAll().stream()
+                .filter(user -> user.getEmail().equals(email))
+                .findFirst()
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(null));
+    }
+    @DeleteMapping
+    public ResponseEntity<String> deleteAllUsers() {
+        userRepository.deleteAll();
+        return ResponseEntity.ok("Todos los usuarios han sido eliminados.");
+    }
+    @GetMapping("/count")
+    public ResponseEntity<Long> countUsers() {
+        long count = userRepository.count();
+        return ResponseEntity.ok(count);
+    }
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchUsersByName(@RequestParam String keyword) {
+        List<User> users = userRepository.findAll().stream()
+                .filter(user -> user.getName().toLowerCase().contains(keyword.toLowerCase()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(users);
+    }
+    @GetMapping("/paged")
+    public ResponseEntity<List<User>> getPagedUsers(@RequestParam int page, @RequestParam int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<User> userPage = userRepository.findAll(pageable);
+        return ResponseEntity.ok(userPage.getContent());
+    }
+    @GetMapping("/health")
+    public ResponseEntity<String> healthCheck() {
+        return ResponseEntity.ok("La API está funcionando correctamente.");
+    }
+    @PostMapping("/batch")
+    public ResponseEntity<String> createUsersBatch(@RequestBody List<User> usersBatch) {
+        userRepository.saveAll(usersBatch);
+        return ResponseEntity.status(HttpStatus.CREATED).body("Usuarios creados exitosamente.");
+    }
+    @GetMapping("/batch")
+    public ResponseEntity<List<User>> getUsersByIds(@RequestParam List<Long> ids) {
+        List<User> users = userRepository.findAllById(ids);
+        return ResponseEntity.ok(users);
+    }
+    @PutMapping("/reset-names")
+    public ResponseEntity<String> resetAllUserNames(@RequestParam String defaultName) {
+        List<User> users = userRepository.findAll();
+        for (User user : users) {
+            user.setName(defaultName);
+        }
+        userRepository.saveAll(users);
+        return ResponseEntity.ok("Todos los nombres de usuario han sido restablecidos.");
+    }
+
 }
